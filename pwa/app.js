@@ -41,6 +41,7 @@ function bindEventos() {
     });
     document.getElementById('btn-sincronizar').addEventListener('click', () => sincronizarConteo(almacenActivo, conteoActual));
     document.getElementById('btn-sync').addEventListener('click', sincronizarPendientes);
+    document.getElementById('lista-productos').addEventListener('change', onConteoChange);
 
     window.addEventListener('online', () => {
         actualizarBannerOffline();
@@ -85,7 +86,10 @@ async function cargarAlmacenes() {
 }
 
 function renderAlmacenes(rows) {
-    document.getElementById('sel-almacen').innerHTML = ['<option value="">Selecciona almacén</option>', ...rows.map(a => `<option value="${a.clave}">${a.clave}</option>`)].join('');
+    document.getElementById('sel-almacen').innerHTML = [
+        '<option value="">Selecciona almacén</option>',
+        ...rows.map(a => `<option value="${escAttr(a.clave)}">${escHtml(a.clave)}</option>`)
+    ].join('');
 }
 
 async function iniciarConteo(clave) {
@@ -138,16 +142,21 @@ function renderProductos(items) {
         return `
         <div class="pwa-card pwa-item">
             <div>
-                <div><strong>${item.codigo || ''}</strong></div>
-                <div>${item.producto || ''}</div>
+                <div><strong>${escHtml(item.codigo || '')}</strong></div>
+                <div>${escHtml(item.producto || '')}</div>
             </div>
             <div>Sis: ${Number(item.sistema).toFixed(2)}</div>
             <div>
-                <input class="pwa-input" type="number" step="0.0001" value="${item.contado}" onchange="actualizarContado(${item.producto_id}, this.value)">
+                <input class="pwa-input js-contado" type="number" step="0.0001" value="${item.contado}" data-producto-id="${Number(item.producto_id)}">
                 <div class="${diff >= 0 ? 'pwa-diff-pos' : 'pwa-diff-neg'}">${diff >= 0 ? '+' : ''}${diff.toFixed(2)}</div>
             </div>
         </div>`;
     }).join('');
+}
+
+function onConteoChange(event) {
+    if (!event.target.classList.contains('js-contado')) return;
+    actualizarContado(Number(event.target.dataset.productoId), event.target.value);
 }
 
 function actualizarContado(productoId, valor) {
@@ -167,7 +176,7 @@ function mostrarResumen() {
     const difs = conteoActual.filter(i => Number(i.contado) - Number(i.sistema) !== 0);
     document.getElementById('tbody-resumen').innerHTML = !difs.length
         ? '<tr><td colspan="4">Sin diferencias</td></tr>'
-        : difs.map(i => `<tr><td>${i.codigo} · ${i.producto}</td><td>${Number(i.sistema).toFixed(2)}</td><td>${Number(i.contado).toFixed(2)}</td><td>${Number(i.contado - i.sistema).toFixed(2)}</td></tr>`).join('');
+        : difs.map(i => `<tr><td>${escHtml(i.codigo)} · ${escHtml(i.producto)}</td><td>${Number(i.sistema).toFixed(2)}</td><td>${Number(i.contado).toFixed(2)}</td><td>${Number(i.contado - i.sistema).toFixed(2)}</td></tr>`).join('');
     mostrarPantalla('screen-resumen');
 }
 
@@ -230,4 +239,17 @@ async function sincronizarPendientes() {
     }
 
     localStorage.setItem('cwo_conteos_pendientes', JSON.stringify(remaining));
+}
+
+function escHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function escAttr(value) {
+    return escHtml(value).replaceAll('`', '&#96;');
 }

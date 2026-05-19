@@ -9,6 +9,7 @@ header('Content-Type: application/json');
 
 $db = DB::get('almacenes');
 $action = $_GET['action'] ?? '';
+const EPSILON_DIFERENCIA = 0.000001;
 
 try {
     if ($action !== 'sincronizar' || $_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -44,7 +45,7 @@ try {
             continue;
         }
 
-        if (abs($diferencia) < 0.000001) {
+        if (abs($diferencia) < EPSILON_DIFERENCIA) {
             $sinDiferencia++;
             continue;
         }

@@ -16,9 +16,18 @@ async function iniciarEstructura() {
 
     document.getElementById('tbody-costeo-estructura').innerHTML = !_costeoRows.length
         ? '<tr><td colspan="8">Sin productos</td></tr>'
-        : _costeoRows.map(r => `<tr><td>${r.codigo}</td><td>${r.producto}</td><td>${r.tipo_costeo || '-'}</td><td>${Number(r.costo_mp || 0).toFixed(2)}</td><td>${Number(r.costo_mo || 0).toFixed(2)}</td><td>${Number(r.costo_gi || 0).toFixed(2)}</td><td>${Number(r.costo_total || 0).toFixed(2)}</td><td><button class="btn-secondary" onclick='abrirModalCosto(${JSON.stringify(r).replace(/"/g, '&quot;')})'>Editar</button></td></tr>`).join('');
+        : _costeoRows.map((r, i) => `<tr><td>${escHtml(r.codigo)}</td><td>${escHtml(r.producto)}</td><td>${escHtml(r.tipo_costeo || '-')}</td><td>${Number(r.costo_mp || 0).toFixed(2)}</td><td>${Number(r.costo_mo || 0).toFixed(2)}</td><td>${Number(r.costo_gi || 0).toFixed(2)}</td><td>${Number(r.costo_total || 0).toFixed(2)}</td><td><button class="btn-secondary js-editar-costo" data-index="${i}">Editar</button></td></tr>`).join('');
 
-    ['costeo-mp', 'costeo-mo', 'costeo-gi'].forEach(id => document.getElementById(id).addEventListener('input', recalcularCostoTotal));
+    ['costeo-mp', 'costeo-mo', 'costeo-gi'].forEach(id => { document.getElementById(id).oninput = recalcularCostoTotal; });
+    document.getElementById('tbody-costeo-estructura').onclick = onTablaCostoClick;
+}
+
+function onTablaCostoClick(e) {
+    const btn = e.target.closest('.js-editar-costo');
+    if (!btn) return;
+    const index = Number(btn.dataset.index);
+    if (!Number.isFinite(index) || !_costeoRows[index]) return;
+    abrirModalCosto(_costeoRows[index]);
 }
 
 function abrirModalCosto(row) {
@@ -56,3 +65,12 @@ async function guardarCosto(e) {
 document.addEventListener('click', e => {
     if (e.target.id === 'modal-costeo') cerrarModalCosto();
 });
+
+function escHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
