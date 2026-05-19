@@ -20,6 +20,7 @@ try {
             $sql = "
                 SELECT
                     i.id,
+                    p.id            AS producto_id,
                     i.franquicia_clave,
                     p.codigo,
                     p.nombre        AS producto,
@@ -37,8 +38,8 @@ try {
                         ELSE 'stock_ok'
                     END AS estado_stock
                 FROM inventario i
-                JOIN productos p           ON p.id  = i.producto_id
-                LEFT JOIN lineas l         ON l.id  = p.linea_id
+                JOIN productos p             ON p.id  = i.producto_id
+                LEFT JOIN lineas l           ON l.id  = p.linea_id
                 LEFT JOIN unidades_medida um ON um.id = p.unidad_medida_id
                 WHERE p.activo = 1
             ";
@@ -53,6 +54,45 @@ try {
 
             $stmt = $db->prepare($sql);
             $stmt->execute($params);
+
+            echo json_encode(['ok' => true, 'data' => $stmt->fetchAll()]);
+            break;
+
+        // ── Listar para PWA conteo físico ─────────────────
+        // Devuelve TODOS los productos activos de un almacén,
+        // incluyendo los que tienen existencias = 0 (LEFT JOIN)
+        case 'listar_pwa':
+            $clave = trim($_GET['clave'] ?? '');
+            if (!$clave) {
+                echo json_encode(['ok' => false, 'message' => 'Falta clave de almacén']);
+                exit;
+            }
+
+            // Si no es CWO solo puede ver su propio almacén
+            if (!Session::isCWO() && Session::$franquicia !== $clave) {
+                echo json_encode(['ok' => false, 'message' => 'Sin acceso a ese almacén']);
+                exit;
+            }
+
+            $stmt = $db->prepare("
+                SELECT
+                    p.id               AS producto_id,
+                    p.codigo,
+                    p.nombre           AS producto,
+                    p.tipo,
+                    um.abrev           AS unidad,
+                    COALESCE(i.existencias, 0) AS existencias,
+                    ? AS franquicia_clave
+                FROM productos p
+                LEFT JOIN unidades_medida um ON um.id = p.unidad_medida_id
+                LEFT JOIN inventario i
+                       ON i.producto_id     = p.id
+                      AND i.franquicia_clave = ?
+                WHERE p.activo = 1
+                  AND p.ctrl_almacen = 1
+                ORDER BY p.tipo, p.nombre
+            ");
+            $stmt->execute([$clave, $clave]);
 
             echo json_encode(['ok' => true, 'data' => $stmt->fetchAll()]);
             break;
@@ -120,7 +160,6 @@ try {
                 exit;
             }
 
-            // Verificar almacén
             $chk = $db->prepare("SELECT id FROM almacenes WHERE clave = ? AND activo = 1");
             $chk->execute([$clave]);
             if (!$chk->fetch()) {
