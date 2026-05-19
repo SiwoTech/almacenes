@@ -20,6 +20,7 @@ try {
             $sql = "
                 SELECT
                     i.id,
+                    i.producto_id,
                     i.franquicia_clave,
                     p.codigo,
                     p.nombre        AS producto,

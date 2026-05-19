@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Conteo Físico</title>
+    <link rel="manifest" href="/almacenes/pwa/manifest.json">
+    <link rel="stylesheet" href="/almacenes/pwa/style.css">
+    <link rel="stylesheet" href="/almacenes/assets/css/almacenes.css">
+</head>
+<body>
+    <div id="offline-banner" class="pwa-offline-banner" style="display:none;">Sin conexión - se sincronizará al reconectar</div>
+
+    <header class="pwa-header">
+        <h1>Conteo Físico</h1>
+        <button id="btn-sync" class="pwa-btn pwa-btn-sm" type="button">Sync</button>
+    </header>
+
+    <main class="pwa-main">
+        <section id="screen-inicio" class="pwa-screen active">
+            <div class="pwa-card">
+                <label>Almacén</label>
+                <select id="sel-almacen" class="pwa-input"></select>
+                <button id="btn-iniciar" class="pwa-btn" type="button">Iniciar conteo</button>
+            </div>
+        </section>
+
+        <section id="screen-conteo" class="pwa-screen">
+            <div class="pwa-card">
+                <input id="buscar-producto" class="pwa-input" type="text" placeholder="Buscar código o nombre">
+            </div>
+            <div id="lista-productos"></div>
+            <button id="btn-guardar" class="pwa-btn" type="button">Guardar conteo</button>
+        </section>
+
+        <section id="screen-resumen" class="pwa-screen">
+            <div class="pwa-card">
+                <table class="tabla-base">
+                    <thead><tr><th>Producto</th><th>Sistema</th><th>Contado</th><th>Diferencia</th></tr></thead>
+                    <tbody id="tbody-resumen"></tbody>
+                </table>
+                <button id="btn-sincronizar" class="pwa-btn" type="button">Sincronizar con servidor</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="/almacenes/pwa/app.js"></script>
+</body>
+</html>
