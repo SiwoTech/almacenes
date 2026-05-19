@@ -95,14 +95,21 @@ async function iniciarConteo(clave) {
     try {
         const res = await apiFetch('/almacenes/api/inventario/stock.php?action=listar');
         if (!res.ok) throw new Error('Error al cargar inventario');
-        productos = (res.data || []).filter(p => p.franquicia_clave === clave).map(p => ({
-            producto_id: p.id || p.producto_id,
-            codigo: p.codigo,
-            producto: p.producto,
-            sistema: Number(p.existencias || 0),
-            contado: Number(p.existencias || 0),
-            diferencia: 0,
-        }));
+        productos = (res.data || [])
+            .filter(p => p.franquicia_clave === clave)
+            .map(p => {
+                const productoId = Number(p.producto_id || 0);
+                if (!productoId) return null;
+                return {
+                    producto_id: productoId,
+                    codigo: p.codigo,
+                    producto: p.producto,
+                    sistema: Number(p.existencias || 0),
+                    contado: Number(p.existencias || 0),
+                    diferencia: 0,
+                };
+            })
+            .filter(Boolean);
         localStorage.setItem(`cwo_productos_${clave}`, JSON.stringify(productos));
     } catch (_) {
         productos = JSON.parse(localStorage.getItem(`cwo_productos_${clave}`) || '[]');
