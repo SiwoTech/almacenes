@@ -1,0 +1,82 @@
+:root {
+    --naranja: #ff6a00;
+    --naranja-soft: #fff4ee;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #f8f9fa;
+    margin: 0;
+    color: #1f2937;
+}
+
+.pwa-header {
+    background: var(--naranja);
+    color: #fff;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pwa-header h1 { margin: 0; font-size: 1.1rem; }
+
+.pwa-main { padding: 12px; }
+
+.pwa-screen { display: none; }
+.pwa-screen.active { display: block; }
+
+.pwa-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    border: 0;
+    background: var(--naranja);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 10px;
+}
+
+.pwa-btn-sm { width: auto; margin-top: 0; padding: 8px 12px; font-size: .85rem; }
+
+.pwa-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    font-size: 1rem;
+}
+
+.pwa-card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+    padding: 12px;
+    margin-bottom: 10px;
+}
+
+.pwa-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.pwa-diff-pos { color: #047857; font-weight: 700; }
+.pwa-diff-neg { color: #b91c1c; font-weight: 700; }
+
+.pwa-offline-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: #b91c1c;
+    color: #fff;
+    font-size: .85rem;
+    text-align: center;
+    padding: 8px;
+}

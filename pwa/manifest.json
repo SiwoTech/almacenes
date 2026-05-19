@@ -1,0 +1,9 @@
+{
+  "name": "Conteo Físico - Almacenes",
+  "short_name": "Conteo",
+  "start_url": "/almacenes/pwa/index.html",
+  "display": "standalone",
+  "background_color": "#ff6a00",
+  "theme_color": "#ff6a00",
+  "icons": [{ "src": "/almacenes/assets/img/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+}
