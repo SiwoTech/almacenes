@@ -49,13 +49,13 @@ function bindEventos() {
     });
     window.addEventListener('offline', actualizarBannerOffline);
 
-    navigator.serviceWorker?.addEventListener('message', event => {
-        if (event.data?.type === 'sync-conteos') sincronizarPendientes();
+    navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'sync-conteos') sincronizarPendientes();
     });
 }
 
 function mostrarPantalla(id) {
-    document.querySelectorAll('.pwa-screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.pwa-screen').forEach(function(s) { s.classList.remove('active'); });
     document.getElementById(id).classList.add('active');
 }
 
@@ -66,91 +66,119 @@ function actualizarBannerOffline() {
 async function registrarSW() {
     if (!('serviceWorker' in navigator)) return;
     try {
-        const reg = await navigator.serviceWorker.register('/almacenes/pwa/sw.js');
+        var reg = await navigator.serviceWorker.register('/almacenes/pwa/sw.js');
         if ('sync' in reg) {
-            try { await reg.sync.register('cwo-sync-conteos'); } catch (_) {}
+            try { await reg.sync.register('cwo-sync-conteos'); } catch (e) {}
         }
-    } catch (_) {}
+    } catch (e) {}
 }
 
 async function cargarAlmacenes() {
     try {
-        const res = await apiFetch('/almacenes/api/inventario/stock.php?action=almacenes');
+        var res = await apiFetch('/almacenes/api/inventario/stock.php?action=almacenes');
         if (!res.ok) throw new Error('No se cargaron almacenes');
         localStorage.setItem('cwo_almacenes_cache', JSON.stringify(res.data || []));
         renderAlmacenes(res.data || []);
-    } catch (_) {
-        const cache = JSON.parse(localStorage.getItem('cwo_almacenes_cache') || '[]');
+    } catch (e) {
+        var cache = JSON.parse(localStorage.getItem('cwo_almacenes_cache') || '[]');
         renderAlmacenes(cache);
     }
 }
 
 function renderAlmacenes(rows) {
-    document.getElementById('sel-almacen').innerHTML = [
-        '<option value="">Selecciona almacén</option>',
-        ...rows.map(a => `<option value="${escAttr(a.clave)}">${escHtml(a.clave)}</option>`)
-    ].join('');
+    var opts = ['<option value="">Selecciona almacén</option>'];
+    rows.forEach(function(a) {
+        opts.push('<option value="' + escAttr(a.clave) + '">' + escHtml(a.clave) + '</option>');
+    });
+    document.getElementById('sel-almacen').innerHTML = opts.join('');
 }
 
 async function iniciarConteo(clave) {
-    if (!clave) return;
+    if (!clave) {
+        alert('Selecciona un almacén primero');
+        return;
+    }
     almacenActivo = clave;
 
+    // Mostrar indicador de carga
+    mostrarPantalla('screen-conteo');
+    document.getElementById('lista-productos').innerHTML = '<div class="pwa-card" style="text-align:center;padding:30px;">⏳ Cargando productos...</div>';
+    document.getElementById('buscar-producto').value = '';
+
     try {
-        const res = await apiFetch('/almacenes/api/inventario/stock.php?action=listar');
-        if (!res.ok) throw new Error('Error al cargar inventario');
-        productos = (res.data || [])
-            .filter(p => p.franquicia_clave === clave)
-            .map(p => {
-                const productoId = Number(p.producto_id || 0);
-                if (!productoId) return null;
-                return {
-                    producto_id: productoId,
-                    codigo: p.codigo,
-                    producto: p.producto,
-                    sistema: Number(p.existencias || 0),
-                    contado: Number(p.existencias || 0),
-                    diferencia: 0,
-                };
-            })
-            .filter(Boolean);
-        localStorage.setItem(`cwo_productos_${clave}`, JSON.stringify(productos));
-    } catch (_) {
-        productos = JSON.parse(localStorage.getItem(`cwo_productos_${clave}`) || '[]');
+        // Usar listar_pwa que devuelve TODOS los productos activos del almacén
+        // incluso los que no tienen registro en inventario (existencias = 0)
+        var res = await apiFetch('/almacenes/api/inventario/stock.php?action=listar_pwa&clave=' + encodeURIComponent(clave));
+        if (!res.ok) throw new Error(res.message || 'Error al cargar inventario');
+
+        productos = (res.data || []).map(function(p) {
+            return {
+                producto_id: Number(p.producto_id || 0),
+                codigo:      p.codigo     || '',
+                producto:    p.producto   || '',
+                tipo:        p.tipo       || '',
+                unidad:      p.unidad     || '',
+                sistema:     Number(p.existencias || 0),
+                contado:     Number(p.existencias || 0),
+                diferencia:  0,
+            };
+        }).filter(function(p) { return p.producto_id > 0; });
+
+        localStorage.setItem('cwo_productos_' + clave, JSON.stringify(productos));
+
+        if (!productos.length) {
+            document.getElementById('lista-productos').innerHTML =
+                '<div class="pwa-card" style="color:#856404;background:#fff8e1;padding:16px;">⚠️ No hay productos con control de almacén para esta franquicia.</div>';
+            conteoActual = [];
+            return;
+        }
+
+    } catch (e) {
+        // Modo offline: cargar desde caché
+        productos = JSON.parse(localStorage.getItem('cwo_productos_' + clave) || '[]');
+        if (!productos.length) {
+            document.getElementById('lista-productos').innerHTML =
+                '<div class="pwa-card" style="color:#991b1b;background:#fff0f0;padding:16px;">❌ Sin conexión y sin caché disponible para este almacén.</div>';
+            conteoActual = [];
+            return;
+        }
     }
 
-    conteoActual = productos.map(p => ({ ...p }));
+    conteoActual = productos.map(function(p) { return Object.assign({}, p); });
     renderProductos(conteoActual);
-    mostrarPantalla('screen-conteo');
 }
 
 function buscarProducto(query) {
-    const q = (query || '').toLowerCase().trim();
+    var q = (query || '').toLowerCase().trim();
     if (!q) return conteoActual;
-    return conteoActual.filter(p => `${p.codigo} ${p.producto}`.toLowerCase().includes(q));
+    return conteoActual.filter(function(p) {
+        return (p.codigo + ' ' + p.producto).toLowerCase().indexOf(q) !== -1;
+    });
 }
 
 function renderProductos(items) {
-    const el = document.getElementById('lista-productos');
-    if (!items.length) {
-        el.innerHTML = '<div class="pwa-card">Sin productos</div>';
+    var el = document.getElementById('lista-productos');
+    if (!items || !items.length) {
+        el.innerHTML = '<div class="pwa-card" style="text-align:center;padding:20px;color:#6c757d;">Sin productos que coincidan</div>';
         return;
     }
 
-    el.innerHTML = items.map(item => {
-        const diff = Number(item.contado) - Number(item.sistema);
-        return `
-        <div class="pwa-card pwa-item">
-            <div>
-                <div><strong>${escHtml(item.codigo || '')}</strong></div>
-                <div>${escHtml(item.producto || '')}</div>
-            </div>
-            <div>Sis: ${Number(item.sistema).toFixed(2)}</div>
-            <div>
-                <input class="pwa-input js-contado" type="number" step="0.0001" value="${item.contado}" data-producto-id="${Number(item.producto_id)}">
-                <div class="${diff >= 0 ? 'pwa-diff-pos' : 'pwa-diff-neg'}">${diff >= 0 ? '+' : ''}${diff.toFixed(2)}</div>
-            </div>
-        </div>`;
+    el.innerHTML = items.map(function(item) {
+        var diff = Number(item.contado) - Number(item.sistema);
+        var diffClass = diff > 0 ? 'pwa-diff-pos' : (diff < 0 ? 'pwa-diff-neg' : 'pwa-diff-cero');
+        var diffStr  = (diff >= 0 ? '+' : '') + diff.toFixed(2);
+        return '<div class="pwa-card pwa-item">' +
+            '<div class="pwa-item-info">' +
+                '<div><strong>' + escHtml(item.codigo) + '</strong></div>' +
+                '<div class="pwa-item-nombre">' + escHtml(item.producto) + '</div>' +
+                '<div class="pwa-item-tipo">' + escHtml(item.tipo) + (item.unidad ? ' · ' + escHtml(item.unidad) : '') + '</div>' +
+            '</div>' +
+            '<div class="pwa-item-sis">Sis:<br><strong>' + Number(item.sistema).toFixed(2) + '</strong></div>' +
+            '<div class="pwa-item-cnt">' +
+                '<input class="pwa-input js-contado" type="number" step="0.01" min="0" value="' + item.contado + '" data-producto-id="' + Number(item.producto_id) + '">' +
+                '<div class="' + diffClass + '">' + diffStr + '</div>' +
+            '</div>' +
+        '</div>';
     }).join('');
 }
 
@@ -160,96 +188,110 @@ function onConteoChange(event) {
 }
 
 function actualizarContado(productoId, valor) {
-    conteoActual = conteoActual.map(i => {
+    conteoActual = conteoActual.map(function(i) {
         if (Number(i.producto_id) !== Number(productoId)) return i;
-        const contado = Number(valor || 0);
-        return { ...i, contado, diferencia: contado - Number(i.sistema) };
+        var contado = Number(valor || 0);
+        return Object.assign({}, i, { contado: contado, diferencia: contado - Number(i.sistema) });
     });
     renderProductos(buscarProducto(document.getElementById('buscar-producto').value));
 }
 
 function guardarConteoLocal(clave, items) {
-    localStorage.setItem(`cwo_conteo_${clave}`, JSON.stringify(items));
+    localStorage.setItem('cwo_conteo_' + clave, JSON.stringify(items));
 }
 
 function mostrarResumen() {
-    const difs = conteoActual.filter(i => Number(i.contado) - Number(i.sistema) !== 0);
-    document.getElementById('tbody-resumen').innerHTML = !difs.length
-        ? '<tr><td colspan="4">Sin diferencias</td></tr>'
-        : difs.map(i => `<tr><td>${escHtml(i.codigo)} · ${escHtml(i.producto)}</td><td>${Number(i.sistema).toFixed(2)}</td><td>${Number(i.contado).toFixed(2)}</td><td>${Number(i.contado - i.sistema).toFixed(2)}</td></tr>`).join('');
+    var difs = conteoActual.filter(function(i) { return (Number(i.contado) - Number(i.sistema)) !== 0; });
+    var tbody = document.getElementById('tbody-resumen');
+    if (!difs.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:16px;">✅ Sin diferencias</td></tr>';
+    } else {
+        tbody.innerHTML = difs.map(function(i) {
+            var diff = Number(i.contado) - Number(i.sistema);
+            return '<tr>' +
+                '<td>' + escHtml(i.codigo) + ' · ' + escHtml(i.producto) + '</td>' +
+                '<td>' + Number(i.sistema).toFixed(2) + '</td>' +
+                '<td>' + Number(i.contado).toFixed(2) + '</td>' +
+                '<td class="' + (diff >= 0 ? 'pwa-diff-pos' : 'pwa-diff-neg') + '">' + (diff >= 0 ? '+' : '') + diff.toFixed(2) + '</td>' +
+            '</tr>';
+        }).join('');
+    }
     mostrarPantalla('screen-resumen');
 }
 
 async function sincronizarConteo(clave, items) {
-    const payload = {
-        clave,
-        items: items.map(i => ({
-            producto_id: i.producto_id,
-            contado: Number(i.contado),
-            sistema: Number(i.sistema),
-            diferencia: Number(i.contado) - Number(i.sistema),
-        })),
+    var payload = {
+        clave: clave,
+        items: items.map(function(i) {
+            return {
+                producto_id: i.producto_id,
+                contado:     Number(i.contado),
+                sistema:     Number(i.sistema),
+                diferencia:  Number(i.contado) - Number(i.sistema),
+            };
+        }),
     };
 
     if (!navigator.onLine) {
         encolarPendiente(payload);
         actualizarBannerOffline();
+        alert('Sin conexión. El conteo se sincronizará automáticamente al reconectar.');
         return;
     }
 
     try {
-        const res = await apiFetch('/almacenes/api/inventario/fisico.php?action=sincronizar', {
-            method: 'POST',
+        var res = await apiFetch('/almacenes/api/inventario/fisico.php?action=sincronizar', {
+            method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body:    JSON.stringify(payload),
         });
         if (!res.ok) throw new Error(res.message || 'Error de sincronización');
-        localStorage.removeItem(`cwo_conteo_${clave}`);
-        alert(`Sincronización completa. Ajustados: ${res.ajustados || 0}`);
+        localStorage.removeItem('cwo_conteo_' + clave);
+        alert('✅ Sincronización completa. Ajustados: ' + (res.ajustados || 0) + ', Sin diferencia: ' + (res.sin_diferencia || 0));
         mostrarPantalla('screen-inicio');
-    } catch (_) {
+    } catch (e) {
         encolarPendiente(payload);
+        alert('❌ Error al sincronizar. Se guardó localmente para reintentar.');
         actualizarBannerOffline();
     }
 }
 
 function encolarPendiente(payload) {
-    const queue = JSON.parse(localStorage.getItem('cwo_conteos_pendientes') || '[]');
+    var queue = JSON.parse(localStorage.getItem('cwo_conteos_pendientes') || '[]');
     queue.push(payload);
     localStorage.setItem('cwo_conteos_pendientes', JSON.stringify(queue));
 }
 
 async function sincronizarPendientes() {
     if (!navigator.onLine) return;
-    const queue = JSON.parse(localStorage.getItem('cwo_conteos_pendientes') || '[]');
+    var queue = JSON.parse(localStorage.getItem('cwo_conteos_pendientes') || '[]');
     if (!queue.length) return;
 
-    const remaining = [];
-    for (const item of queue) {
+    var remaining = [];
+    for (var i = 0; i < queue.length; i++) {
         try {
-            const res = await apiFetch('/almacenes/api/inventario/fisico.php?action=sincronizar', {
-                method: 'POST',
+            var res = await apiFetch('/almacenes/api/inventario/fisico.php?action=sincronizar', {
+                method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(item),
+                body:    JSON.stringify(queue[i]),
             });
-            if (!res.ok) remaining.push(item);
-        } catch (_) {
-            remaining.push(item);
+            if (!res.ok) remaining.push(queue[i]);
+        } catch (e) {
+            remaining.push(queue[i]);
         }
     }
-
     localStorage.setItem('cwo_conteos_pendientes', JSON.stringify(remaining));
 }
 
 function escHtml(value) {
-    return String(value ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function escAttr(value) {
-    return escHtml(value).replaceAll('`', '&#96;');
+    return escHtml(value).replace(/`/g, '&#96;');
 }
